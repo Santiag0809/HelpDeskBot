@@ -1,0 +1,615 @@
+{
+  "name": "HelpDeskBot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "44a781b4-cf53-47d9-bb8f-afeb5fc3bfb2",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        128
+      ],
+      "webhookId": "helpdesk-webhook",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json;\n\nconst chatId = msg?.message?.chat?.id || msg?.callback_query?.message?.chat?.id;\nconst userId = msg?.message?.from?.id || msg?.callback_query?.from?.id;\nconst username = msg?.message?.from?.username || msg?.callback_query?.from?.username || 'desconocido';\nconst text = (msg?.message?.text || '').trim();\n\nif (!chatId) {\n  throw new Error('No se pudo extraer chat_id del mensaje');\n}\n\nreturn [{\n  json: {\n    chatId,\n    userId,\n    username,\n    text,\n    rawMessage: msg\n  }\n}];"
+      },
+      "id": "59034821-f69c-4a97-9bc3-980e24eed850",
+      "name": "Extraer datos del mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "USUARIOS",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "telegram_user",
+              "lookupValue": "={{ $json.username }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "376ad7d6-13ae-4f16-a46c-92b97672ea30",
+      "name": "Verificar usuario activo",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -688,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "r3MxYjqaCYFW2nkw",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "user-active-check",
+              "leftValue": "={{ $json.activo }}",
+              "rightValue": "TRUE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4b4ba26f-4f5b-4818-9bc3-4b6cd21bd246",
+      "name": "¿Usuario activo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "⛔ <b>Acceso denegado</b>\n\nTu usuario no está registrado o no tiene acceso al sistema.\n\nContacta al administrador para solicitar acceso.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b40677be-473d-4f92-bc29-f63ef11527e4",
+      "name": "Mensaje: sin acceso",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        416
+      ],
+      "webhookId": "43b5d4d7-5178-433c-b7c2-443a8d1022fc",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
+                    "rightValue": "0",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ayuda"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
+                    "rightValue": "1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "crear_solicitud"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
+                    "rightValue": "2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "consultar_estado"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
+                    "rightValue": "3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "mis_solicitudes"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "bienvenida"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "6ef48d20-7c98-4b6b-96d0-c2b00eeb2cd1",
+      "name": "Router principal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -240,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "Hola, soy HelpDeskBot 👋\n\nEstoy aquí para ayudarte con solicitudes de soporte de forma rápida y ordenada.\n\nPor favor escribe el <b>número</b> de la opción que quieras usar:\n\n<b>Menú principal:</b>\n0️⃣  Ayuda\n1️⃣  Crear solicitud\n2️⃣  Consultar estado de solicitud\n3️⃣  Mis solicitudes\n4️⃣  Reportes\n5️⃣  Configuración",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "bc40360a-623b-4f8b-be29-433af3695629",
+      "name": "Mensaje: bienvenida",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "b1b180aa-0a54-4f07-9f45-451543a097cc",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "ℹ️ <b>Ayuda — HelpDeskBot</b>\n\nEste bot gestiona solicitudes internas de soporte.\n\n<b>Opciones disponibles:</b>\n\n<b>1</b> → Crear una nueva solicitud (incidente, administrativa o consulta)\n<b>2</b> → Consultar el estado de un ticket por su ID\n<b>3</b> → Ver todas tus solicitudes activas\n<b>4</b> → Reportes generales (solo admins)\n<b>5</b> → Configuración de cuenta\n\nEscribe el número de la opción deseada en cualquier momento.\n\n🔙 Escribe <b>0</b> para ver el menú principal.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "f53e54dd-4a80-4302-a2f2-07029b624dbd",
+      "name": "Mensaje: ayuda",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        144
+      ],
+      "webhookId": "0daa21ce-405a-4e9b-86d1-a7999c28dab1",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "📋 <b>Crear solicitud</b>\n\nVamos a crear una solicitud. Primero necesito saber el tipo.\n\n<b>Selecciona el tipo:</b>\n\n<b>1</b> → Soporte técnico\n<b>2</b> → Solicitud administrativa\n<b>3</b> → Consulta general\n\n<b>9</b> → ❌ Cancelar",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "fcb0698a-b5c3-4e0a-bd28-5e9d5740baa0",
+      "name": "Mensaje: crear solicitud",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        288
+      ],
+      "webhookId": "967bfc84-311b-47c5-abac-8136c6bf7a3c",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "🔍 <b>Consultar estado</b>\n\nEsta función estará disponible próximamente.\n\nEscribe <b>0</b> para volver al menú principal.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "c86a6dfc-998c-461b-93bd-6976f54b73ad",
+      "name": "Mensaje: consultar estado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        432
+      ],
+      "webhookId": "ff4b77ce-6576-466d-ab23-9d17c6748549",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "📂 <b>Mis solicitudes</b>\n\nEsta función estará disponible próximamente.\n\nEscribe <b>0</b> para volver al menú principal.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "62dd92b1-e211-4dfc-bf06-b29391302968",
+      "name": "Mensaje: mis solicitudes",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        560
+      ],
+      "webhookId": "d8841e8f-b7a5-4b29-ae26-49ad6d050b42",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
+        "text": "❓ No entendí esa opción.\n\nPor favor escribe solo el <b>número</b> de la opción que deseas.\n\n<b>Menú principal:</b>\n0️⃣  Ayuda\n1️⃣  Crear solicitud\n2️⃣  Consultar estado\n3️⃣  Mis solicitudes",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "659e5693-3794-44cb-86fd-a45995d451d5",
+      "name": "Mensaje: opción inválida",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        704
+      ],
+      "webhookId": "425230f0-dacf-43f2-8224-f283ea9b6f1d",
+      "credentials": {
+        "telegramApi": {
+          "id": "IBs15lGMFpZJlRkO",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "USUARIOS",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e63b0058-930a-49f3-a13c-df6d36af7c09",
+      "name": "Registrar en LOGS",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        352
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "r3MxYjqaCYFW2nkw",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extraer datos del mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer datos del mensaje": {
+      "main": [
+        [
+          {
+            "node": "Verificar usuario activo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar usuario activo": {
+      "main": [
+        [
+          {
+            "node": "¿Usuario activo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Usuario activo?": {
+      "main": [
+        [
+          {
+            "node": "Router principal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: sin acceso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router principal": {
+      "main": [
+        [
+          {
+            "node": "Mensaje: ayuda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: crear solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: consultar estado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: mis solicitudes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: bienvenida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje: opción inválida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje: ayuda": {
+      "main": [
+        [
+          {
+            "node": "Registrar en LOGS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje: crear solicitud": {
+      "main": [
+        [
+          {
+            "node": "Registrar en LOGS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje: consultar estado": {
+      "main": [
+        [
+          {
+            "node": "Registrar en LOGS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje: mis solicitudes": {
+      "main": [
+        [
+          {
+            "node": "Registrar en LOGS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje: bienvenida": {
+      "main": [
+        [
+          {
+            "node": "Registrar en LOGS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "dcb53464-55e5-443b-9bf4-f93f26e113f8",
+  "meta": {
+    "instanceId": "7556666a80d613fd2d755ecfbd13d85542c17abd65eeb371fd1695df0c9e7323"
+  },
+  "id": "WPvZlRu2FVykmoL5",
+  "tags": [
+    {
+      "name": "HelpDeskBot",
+      "id": "yWGfZbC5TNQKlimt",
+      "updatedAt": "2026-04-28T00:47:43.141Z",
+      "createdAt": "2026-04-28T00:47:43.141Z"
+    }
+  ]
+}
