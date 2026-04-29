@@ -3,19 +3,14 @@
   "nodes": [
     {
       "parameters": {
-        "updates": [
-          "message"
-        ],
+        "updates": ["message"],
         "additionalFields": {}
       },
-      "id": "44a781b4-cf53-47d9-bb8f-afeb5fc3bfb2",
+      "id": "telegram-trigger",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [
-        -1120,
-        128
-      ],
+      "position": [180, 300],
       "webhookId": "helpdesk-webhook",
       "credentials": {
         "telegramApi": {
@@ -26,590 +21,391 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json;\n\nconst chatId = msg?.message?.chat?.id || msg?.callback_query?.message?.chat?.id;\nconst userId = msg?.message?.from?.id || msg?.callback_query?.from?.id;\nconst username = msg?.message?.from?.username || msg?.callback_query?.from?.username || 'desconocido';\nconst text = (msg?.message?.text || '').trim();\n\nif (!chatId) {\n  throw new Error('No se pudo extraer chat_id del mensaje');\n}\n\nreturn [{\n  json: {\n    chatId,\n    userId,\n    username,\n    text,\n    rawMessage: msg\n  }\n}];"
+        "jsCode": "const msg = $input.first().json;\nconst chatId = msg?.message?.chat?.id || msg?.callback_query?.message?.chat?.id;\nconst userId = msg?.message?.from?.id || msg?.callback_query?.from?.id;\nconst username = msg?.message?.from?.username || msg?.callback_query?.from?.username || 'desconocido';\nconst text = (msg?.message?.text || '').trim();\nif (!chatId) throw new Error('No se pudo extraer chat_id');\n\n// Revisar si hay un wizard activo para este usuario\nconst sd = $getWorkflowStaticData('global');\nconst key = `wizard_${chatId}`;\nconst wizard = sd[key] || null;\n\nreturn [{ json: { chatId, userId, username, text, wizard, wizardKey: key } }];"
       },
-      "id": "59034821-f69c-4a97-9bc3-980e24eed850",
+      "id": "extract-data",
       "name": "Extraer datos del mensaje",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -896,
-        128
-      ]
+      "position": [380, 300]
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "USUARIOS",
-          "mode": "name"
-        },
+        "authentication": "oAuth2",
+        "documentId": { "__rl": true, "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "USUARIOS", "mode": "name" },
         "filtersUI": {
-          "values": [
-            {
-              "lookupColumn": "telegram_user",
-              "lookupValue": "={{ $json.username }}"
-            }
-          ]
+          "values": [{ "lookupColumn": "telegram_user", "lookupValue": "={{ $json.username }}" }]
         },
         "options": {}
       },
-      "id": "376ad7d6-13ae-4f16-a46c-92b97672ea30",
+      "id": "check-user",
       "name": "Verificar usuario activo",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [
-        -688,
-        128
-      ],
+      "position": [580, 300],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "r3MxYjqaCYFW2nkw",
-          "name": "Google Sheets account"
-        }
+        "googleSheetsOAuth2Api": { "id": "r3MxYjqaCYFW2nkw", "name": "Google Sheets account" }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "user-active-check",
-              "leftValue": "={{ $json.activo }}",
-              "rightValue": "TRUE",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
+          "conditions": [{ "leftValue": "={{ $json.activo }}", "rightValue": "TRUE", "operator": { "type": "string", "operation": "equals" } }],
           "combinator": "and"
         },
         "options": {}
       },
-      "id": "4b4ba26f-4f5b-4818-9bc3-4b6cd21bd246",
+      "id": "is-user-active",
       "name": "¿Usuario activo?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        -464,
-        128
-      ]
+      "position": [780, 300]
     },
     {
       "parameters": {
         "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "⛔ <b>Acceso denegado</b>\n\nTu usuario no está registrado o no tiene acceso al sistema.\n\nContacta al administrador para solicitar acceso.",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "text": "⛔ <b>Acceso denegado</b>\n\nTu usuario no está registrado o no tiene acceso.\n\nContacta al administrador.",
+        "additionalFields": { "parse_mode": "HTML" }
       },
-      "id": "b40677be-473d-4f92-bc29-f63ef11527e4",
+      "id": "msg-no-access",
       "name": "Mensaje: sin acceso",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        -224,
-        416
-      ],
-      "webhookId": "43b5d4d7-5178-433c-b7c2-443a8d1022fc",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
+      "position": [980, 480],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verificar si hay wizard activo\nconst data = $('Extraer datos del mensaje').item.json;\nconst sd = $getWorkflowStaticData('global');\nconst wizard = sd[data.wizardKey] || null;\nconst enWizard = wizard !== null;\nreturn [{ json: { ...data, enWizard, wizard } }];"
+      },
+      "id": "check-wizard",
+      "name": "¿Hay wizard activo?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{ "leftValue": "={{ $json.enWizard }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-wizard",
+      "name": "¿En wizard?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1180, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar paso del wizard\nconst { chatId, text, wizardKey, username } = $json;\nconst sd = $getWorkflowStaticData('global');\nconst estado = sd[wizardKey] || { paso: 0 };\n\nif (text === '9') {\n  delete sd[wizardKey];\n  return [{ json: { chatId, action: 'cancelar' } }];\n}\n\nif (estado.paso === 0) {\n  const tipos = { '1': 'Soporte técnico', '2': 'Solicitud administrativa', '3': 'Consulta general' };\n  if (!tipos[text]) return [{ json: { chatId, action: 'error_tipo' } }];\n  sd[wizardKey] = { paso: 1, tipo: tipos[text], username };\n  return [{ json: { chatId, action: 'pedir_prioridad', tipo: tipos[text] } }];\n}\n\nif (estado.paso === 1) {\n  const prioridades = { '1': 'Alta', '2': 'Media', '3': 'Baja' };\n  if (!prioridades[text]) return [{ json: { chatId, action: 'error_prioridad' } }];\n  sd[wizardKey] = { ...estado, paso: 2, prioridad: prioridades[text] };\n  return [{ json: { chatId, action: 'pedir_descripcion', prioridad: prioridades[text] } }];\n}\n\nif (estado.paso === 2) {\n  if (text.length < 10) return [{ json: { chatId, action: 'error_descripcion' } }];\n  sd[wizardKey] = { ...estado, paso: 3, descripcion: text };\n  return [{ json: { chatId, action: 'pedir_confirmacion', estado: sd[wizardKey] } }];\n}\n\nif (estado.paso === 3) {\n  if (text === '2') { delete sd[wizardKey]; return [{ json: { chatId, action: 'cancelar' } }]; }\n  if (text !== '1') return [{ json: { chatId, action: 'error_confirmacion', estado } }];\n  const idTicket = 'TKT-' + String(Date.now()).slice(-5);\n  const fecha = new Date().toISOString().replace('T',' ').slice(0,16);\n  delete sd[wizardKey];\n  return [{ json: { chatId, action: 'guardar', ticket: { id_ticket: idTicket, tipo: estado.tipo, prioridad: estado.prioridad, descripcion: estado.descripcion, estado: 'Abierto', creado_por: estado.username, fecha_creacion: fecha } } }];\n}\n\nreturn [{ json: { chatId, action: 'cancelar' } }];"
+      },
+      "id": "proc-wizard",
+      "name": "Procesar wizard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1380, 180]
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
-                    "rightValue": "0",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "ayuda"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
-                    "rightValue": "1",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "crear_solicitud"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
-                    "rightValue": "2",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "consultar_estado"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
-                    "rightValue": "3",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "mis_solicitudes"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}",
-                    "rightValue": "/start",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "bienvenida"
-            }
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "pedir_prioridad", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "pedir_prioridad" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "pedir_descripcion", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "pedir_descripcion" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "pedir_confirmacion", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "pedir_confirmacion" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "guardar", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "guardar" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "cancelar", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "cancelar" }
           ]
         },
-        "options": {
-          "fallbackOutput": "extra"
-        }
+        "options": { "fallbackOutput": "extra" }
       },
-      "id": "6ef48d20-7c98-4b6b-96d0-c2b00eeb2cd1",
+      "id": "router-wizard",
+      "name": "Router wizard",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1580, 180]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "conditions": [{ "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}", "rightValue": "/start", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "bienvenida" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}", "rightValue": "0", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "ayuda" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}", "rightValue": "1", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "crear_solicitud" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}", "rightValue": "2", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "consultar_estado" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $('Extraer datos del mensaje').item.json.text }}", "rightValue": "3", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "mis_solicitudes" }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "router-menu",
       "name": "Router principal",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [
-        -240,
-        112
-      ]
+      "position": [1380, 380]
     },
     {
       "parameters": {
-        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "Hola, soy HelpDeskBot 👋\n\nEstoy aquí para ayudarte con solicitudes de soporte de forma rápida y ordenada.\n\nPor favor escribe el <b>número</b> de la opción que quieras usar:\n\n<b>Menú principal:</b>\n0️⃣  Ayuda\n1️⃣  Crear solicitud\n2️⃣  Consultar estado de solicitud\n3️⃣  Mis solicitudes\n4️⃣  Reportes\n5️⃣  Configuración",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "jsCode": "// Iniciar wizard\nconst { chatId, username, wizardKey } = $('Extraer datos del mensaje').item.json;\nconst sd = $getWorkflowStaticData('global');\nsd[wizardKey] = { paso: 0, username };\nreturn [{ json: { chatId } }];"
       },
-      "id": "bc40360a-623b-4f8b-be29-433af3695629",
+      "id": "init-wizard",
+      "name": "Iniciar wizard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 380]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "Hola, soy HelpDeskBot 👋\n\nEstoy aquí para ayudarte con solicitudes de soporte.\n\n<b>Menú principal:</b>\n0️⃣  Ayuda\n1️⃣  Crear solicitud\n2️⃣  Consultar estado\n3️⃣  Mis solicitudes",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-bienvenida",
       "name": "Mensaje: bienvenida",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ],
-      "webhookId": "b1b180aa-0a54-4f07-9f45-451543a097cc",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
+      "position": [1580, 500],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
     },
     {
       "parameters": {
         "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "ℹ️ <b>Ayuda — HelpDeskBot</b>\n\nEste bot gestiona solicitudes internas de soporte.\n\n<b>Opciones disponibles:</b>\n\n<b>1</b> → Crear una nueva solicitud (incidente, administrativa o consulta)\n<b>2</b> → Consultar el estado de un ticket por su ID\n<b>3</b> → Ver todas tus solicitudes activas\n<b>4</b> → Reportes generales (solo admins)\n<b>5</b> → Configuración de cuenta\n\nEscribe el número de la opción deseada en cualquier momento.\n\n🔙 Escribe <b>0</b> para ver el menú principal.",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "text": "ℹ️ <b>Ayuda — HelpDeskBot</b>\n\n<b>1</b> → Crear solicitud\n<b>2</b> → Consultar estado de ticket\n<b>3</b> → Mis solicitudes\n\nEscribe <b>0</b> para ver el menú.",
+        "additionalFields": { "parse_mode": "HTML" }
       },
-      "id": "f53e54dd-4a80-4302-a2f2-07029b624dbd",
+      "id": "msg-ayuda",
       "name": "Mensaje: ayuda",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        144
-      ],
-      "webhookId": "0daa21ce-405a-4e9b-86d1-a7999c28dab1",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
+      "position": [1580, 620],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
     },
     {
       "parameters": {
         "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "📋 <b>Crear solicitud</b>\n\nVamos a crear una solicitud. Primero necesito saber el tipo.\n\n<b>Selecciona el tipo:</b>\n\n<b>1</b> → Soporte técnico\n<b>2</b> → Solicitud administrativa\n<b>3</b> → Consulta general\n\n<b>9</b> → ❌ Cancelar",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "text": "🔍 <b>Consultar estado</b>\n\nEsta función estará disponible próximamente.\n\nEscribe <b>0</b> para volver al menú.",
+        "additionalFields": { "parse_mode": "HTML" }
       },
-      "id": "fcb0698a-b5c3-4e0a-bd28-5e9d5740baa0",
-      "name": "Mensaje: crear solicitud",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        288
-      ],
-      "webhookId": "967bfc84-311b-47c5-abac-8136c6bf7a3c",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "🔍 <b>Consultar estado</b>\n\nEsta función estará disponible próximamente.\n\nEscribe <b>0</b> para volver al menú principal.",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
-      },
-      "id": "c86a6dfc-998c-461b-93bd-6976f54b73ad",
+      "id": "msg-consultar",
       "name": "Mensaje: consultar estado",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        432
-      ],
-      "webhookId": "ff4b77ce-6576-466d-ab23-9d17c6748549",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
+      "position": [1580, 740],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
     },
     {
       "parameters": {
         "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "📂 <b>Mis solicitudes</b>\n\nEsta función estará disponible próximamente.\n\nEscribe <b>0</b> para volver al menú principal.",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "text": "📂 <b>Mis solicitudes</b>\n\nEsta función estará disponible próximamente.\n\nEscribe <b>0</b> para volver al menú.",
+        "additionalFields": { "parse_mode": "HTML" }
       },
-      "id": "62dd92b1-e211-4dfc-bf06-b29391302968",
+      "id": "msg-mis-solicitudes",
       "name": "Mensaje: mis solicitudes",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        560
-      ],
-      "webhookId": "d8841e8f-b7a5-4b29-ae26-49ad6d050b42",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
+      "position": [1580, 860],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
     },
     {
       "parameters": {
         "chatId": "={{ $('Extraer datos del mensaje').item.json.chatId }}",
-        "text": "❓ No entendí esa opción.\n\nPor favor escribe solo el <b>número</b> de la opción que deseas.\n\n<b>Menú principal:</b>\n0️⃣  Ayuda\n1️⃣  Crear solicitud\n2️⃣  Consultar estado\n3️⃣  Mis solicitudes",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "text": "❓ No entendí esa opción.\n\nEscribe un número del menú:\n0️⃣  Ayuda\n1️⃣  Crear solicitud\n2️⃣  Consultar estado\n3️⃣  Mis solicitudes",
+        "additionalFields": { "parse_mode": "HTML" }
       },
-      "id": "659e5693-3794-44cb-86fd-a45995d451d5",
+      "id": "msg-invalida",
       "name": "Mensaje: opción inválida",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        704
-      ],
-      "webhookId": "425230f0-dacf-43f2-8224-f283ea9b6f1d",
-      "credentials": {
-        "telegramApi": {
-          "id": "IBs15lGMFpZJlRkO",
-          "name": "Telegram account"
-        }
-      }
+      "position": [1580, 980],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "USUARIOS",
-          "mode": "name"
+        "chatId": "={{ $json.chatId }}",
+        "text": "📋 <b>Crear solicitud — Paso 1 de 4</b>\n\nSelecciona el <b>tipo</b>:\n\n<b>1</b> → Soporte técnico\n<b>2</b> → Solicitud administrativa\n<b>3</b> → Consulta general\n\n<b>9</b> → ❌ Cancelar",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-pedir-tipo",
+      "name": "Msg: pedir tipo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, 300],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "✅ Tipo: <b>{{ $json.tipo }}</b>\n\n📋 <b>Paso 2 de 4 — Prioridad</b>\n\n<b>1</b> → 🔴 Alta\n<b>2</b> → 🟡 Media\n<b>3</b> → 🟢 Baja\n\n<b>9</b> → ❌ Cancelar",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-pedir-prioridad",
+      "name": "Msg: pedir prioridad",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, 180],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "✅ Prioridad: <b>{{ $json.prioridad }}</b>\n\n📋 <b>Paso 3 de 4 — Descripción</b>\n\nEscribe la descripción del problema:\n<i>(mínimo 10 caracteres)</i>\n\n<b>9</b> → ❌ Cancelar",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-pedir-descripcion",
+      "name": "Msg: pedir descripción",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, 60],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "📋 <b>Paso 4 de 4 — Confirmación</b>\n\n<b>Tipo:</b> {{ $json.estado.tipo }}\n<b>Prioridad:</b> {{ $json.estado.prioridad }}\n<b>Descripción:</b> {{ $json.estado.descripcion }}\n\n<b>1</b> → ✅ Confirmar\n<b>2</b> → ❌ Cancelar",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-confirmar",
+      "name": "Msg: confirmar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, -60],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "🚫 <b>Solicitud cancelada</b>\n\nEscribe <b>0</b> para volver al menú.",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-cancelado",
+      "name": "Msg: cancelado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, 420],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "⚠️ Opción inválida. Por favor responde con el número indicado.",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-error-wizard",
+      "name": "Msg: error wizard",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1780, 540],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": { "__rl": true, "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "SOLICITUDES", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id_ticket": "={{ $json.ticket.id_ticket }}",
+            "tipo": "={{ $json.ticket.tipo }}",
+            "prioridad": "={{ $json.ticket.prioridad }}",
+            "descripcion": "={{ $json.ticket.descripcion }}",
+            "estado": "Abierto",
+            "creado_por": "={{ $json.ticket.creado_por }}",
+            "fecha_creacion": "={{ $json.ticket.fecha_creacion }}"
+          }
         },
         "options": {}
       },
-      "id": "e63b0058-930a-49f3-a13c-df6d36af7c09",
-      "name": "Registrar en LOGS",
+      "id": "guardar-ticket",
+      "name": "Guardar ticket",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [
-        224,
-        352
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "r3MxYjqaCYFW2nkw",
-          "name": "Google Sheets account"
-        }
-      }
+      "position": [1980, -60],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "r3MxYjqaCYFW2nkw", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "documentId": { "__rl": true, "value": "155DnfVRJTx4uBvuLjlFba2a4NeYZtAGhOqSeR8GK-Tc", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "LOGS", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ new Date().toISOString() }}",
+            "telegram_user": "={{ $json.ticket.creado_por }}",
+            "pantalla": "wizard_crear_ticket",
+            "opcion": "confirmado",
+            "resultado": "={{ $json.ticket.id_ticket }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "log-ticket",
+      "name": "Log ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2180, -60],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "r3MxYjqaCYFW2nkw", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Procesar wizard').item.json.chatId }}",
+        "text": "🎉 <b>¡Solicitud creada!</b>\n\n<b>ID:</b> {{ $('Procesar wizard').item.json.ticket.id_ticket }}\n<b>Tipo:</b> {{ $('Procesar wizard').item.json.ticket.tipo }}\n<b>Prioridad:</b> {{ $('Procesar wizard').item.json.ticket.prioridad }}\n<b>Estado:</b> Abierto\n\nEscribe <b>0</b> para volver al menú.",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "id": "msg-exito",
+      "name": "Msg: ticket creado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2380, -60],
+      "credentials": { "telegramApi": { "id": "IBs15lGMFpZJlRkO", "name": "Telegram account" } }
     }
   ],
-  "pinData": {},
   "connections": {
-    "Telegram Trigger": {
-      "main": [
-        [
-          {
-            "node": "Extraer datos del mensaje",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extraer datos del mensaje": {
-      "main": [
-        [
-          {
-            "node": "Verificar usuario activo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Verificar usuario activo": {
-      "main": [
-        [
-          {
-            "node": "¿Usuario activo?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
+    "Telegram Trigger": { "main": [[{ "node": "Extraer datos del mensaje", "type": "main", "index": 0 }]] },
+    "Extraer datos del mensaje": { "main": [[{ "node": "Verificar usuario activo", "type": "main", "index": 0 }]] },
+    "Verificar usuario activo": { "main": [[{ "node": "¿Usuario activo?", "type": "main", "index": 0 }]] },
     "¿Usuario activo?": {
       "main": [
-        [
-          {
-            "node": "Router principal",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mensaje: sin acceso",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "¿Hay wizard activo?", "type": "main", "index": 0 }],
+        [{ "node": "Mensaje: sin acceso", "type": "main", "index": 0 }]
+      ]
+    },
+    "¿Hay wizard activo?": { "main": [[{ "node": "¿En wizard?", "type": "main", "index": 0 }]] },
+    "¿En wizard?": {
+      "main": [
+        [{ "node": "Procesar wizard", "type": "main", "index": 0 }],
+        [{ "node": "Router principal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Procesar wizard": { "main": [[{ "node": "Router wizard", "type": "main", "index": 0 }]] },
+    "Router wizard": {
+      "main": [
+        [{ "node": "Msg: pedir prioridad", "type": "main", "index": 0 }],
+        [{ "node": "Msg: pedir descripción", "type": "main", "index": 0 }],
+        [{ "node": "Msg: confirmar", "type": "main", "index": 0 }],
+        [{ "node": "Guardar ticket", "type": "main", "index": 0 }],
+        [{ "node": "Msg: cancelado", "type": "main", "index": 0 }],
+        [{ "node": "Msg: error wizard", "type": "main", "index": 0 }]
       ]
     },
     "Router principal": {
       "main": [
-        [
-          {
-            "node": "Mensaje: ayuda",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mensaje: crear solicitud",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mensaje: consultar estado",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mensaje: mis solicitudes",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mensaje: bienvenida",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mensaje: opción inválida",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Mensaje: bienvenida", "type": "main", "index": 0 }],
+        [{ "node": "Mensaje: ayuda", "type": "main", "index": 0 }],
+        [{ "node": "Iniciar wizard", "type": "main", "index": 0 }],
+        [{ "node": "Mensaje: consultar estado", "type": "main", "index": 0 }],
+        [{ "node": "Mensaje: mis solicitudes", "type": "main", "index": 0 }],
+        [{ "node": "Mensaje: opción inválida", "type": "main", "index": 0 }]
       ]
     },
-    "Mensaje: ayuda": {
-      "main": [
-        [
-          {
-            "node": "Registrar en LOGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mensaje: crear solicitud": {
-      "main": [
-        [
-          {
-            "node": "Registrar en LOGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mensaje: consultar estado": {
-      "main": [
-        [
-          {
-            "node": "Registrar en LOGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mensaje: mis solicitudes": {
-      "main": [
-        [
-          {
-            "node": "Registrar en LOGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mensaje: bienvenida": {
-      "main": [
-        [
-          {
-            "node": "Registrar en LOGS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Iniciar wizard": { "main": [[{ "node": "Msg: pedir tipo", "type": "main", "index": 0 }]] },
+    "Guardar ticket": { "main": [[{ "node": "Log ticket", "type": "main", "index": 0 }]] },
+    "Log ticket": { "main": [[{ "node": "Msg: ticket creado", "type": "main", "index": 0 }]] }
   },
-  "active": true,
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
-  },
-  "versionId": "dcb53464-55e5-443b-9bf4-f93f26e113f8",
-  "meta": {
-    "instanceId": "7556666a80d613fd2d755ecfbd13d85542c17abd65eeb371fd1695df0c9e7323"
-  },
-  "id": "WPvZlRu2FVykmoL5",
-  "tags": [
-    {
-      "name": "HelpDeskBot",
-      "id": "yWGfZbC5TNQKlimt",
-      "updatedAt": "2026-04-28T00:47:43.141Z",
-      "createdAt": "2026-04-28T00:47:43.141Z"
-    }
-  ]
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "tags": [{ "name": "HelpDeskBot" }]
 }
